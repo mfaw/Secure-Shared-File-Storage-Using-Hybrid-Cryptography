@@ -62,8 +62,8 @@ class Encryptor:
 
         self.inFile = file   
         i = 0
-        with open(file , 'r') as inFile :
-            with open(outfile, 'w') as outFile:
+        with open(file , 'rb') as inFile :
+            with open(outfile, 'wb') as outFile:
                 while True:
                     cipherObject = self.cyphers[i%len(self.cyphers)]
                     i+=1
@@ -71,21 +71,28 @@ class Encryptor:
 
                     if(len(block) == 0):
                         break
-                    block = block.encode('utf-8')
-                    block = pad(block, cipherObject['size'])
+                    elif(len(block) % cipherObject['size'] != 0):
+                         block += b' ' * (cipherObject['size'] - len(block)) 
+
                     ct = cipherObject['cipher'].encrypt(block)
-                    ct = b64encode(ct).decode('utf-8')
                     outFile.write(ct)
 
         inFile.close()
         outFile.close()
+
         self.dataFile = outfile
+        self.keyFile = self.dataFile.split('.')[0] +'.key' + '.json'
+        self.keyFileEncrypted = self.keyFile.split('.')[0]+'.key'+'.enc' 
         self.initializeMasterCipher()
         self.saveKeyFile()
         self.encryptKeyFile()
         self.saveMasterKey()
         print("key file encrypted -> " , self.keyFileEncrypted)
         print("Data file encrypted ->" , self.dataFile)
+        print("key file -> " , self.keyFile)
+        print("Data file ->" , self.inFile)
+        print("master key ->" , self.masterKey)
+        
 
     def initializeMasterCipher(self):
         if(self.masterCipherType == 'AES'):
@@ -100,36 +107,37 @@ class Encryptor:
             with open('fileToMasterkey.json' , 'r') as outfile:
                 data = json.load(outfile)
         if(data.get(self.inFile) == None):
-            data[self.inFile] = b64encode(self.masterKey).decode('utf-8') 
+            data[self.inFile] = {
+                'key' : b64encode(self.masterKey).decode('utf-8'),
+                'type':"AES"
+            }
             with open('fileToMasterkey.json' , 'w+') as write_file:
                 json.dump(data, write_file, indent=4)
         else:
             print("-"*20,"ERROR Change file name" , "-"*20)
 
     def encryptKeyFile(self):
-        with open(self.keyFile , 'r') as inFile :
-            with open(self.keyFile+'.enc', 'w') as outFile:
+        self.masterCipher = AES.new(self.masterKey , AES.MODE_ECB)
+        with open(self.keyFile , 'rb') as inFile :
+            with open(self.keyFileEncrypted, 'wb') as outFile:
                 while True:
                     cipherObject = self.masterCipher
                     block = inFile.read(self.masterCipherBlockSize)
-
                     if(len(block) == 0):
                         break
-                    block = block.encode('utf-8')
-                    block = pad(block, self.masterCipherBlockSize)
+                    elif(len(block) % self.masterCipherBlockSize != 0):
+                        block+= b' ' * (self.masterCipherBlockSize - len(block)) 
+
                     ct = cipherObject.encrypt(block)
-                    ct = b64encode(ct).decode('utf-8')
                     outFile.write(ct)
         inFile.close()
         outFile.close()
-        self.keyFileEncrypted = self.keyFile.split('.')[0]+'.enc' 
 
     def saveKeyFile(self):
-        self.keyFile = self.dataFile.split('.')[0] +'.key' + '.json'
         with open(f"{self.keyFile}", "w") as write_file:
             json.dump(self.keys, write_file, indent=4)
 
-    def sendFiles(self, dataFile , keyFile):
+    def sendFiles(self):
         # FTP server credentials
         FTP_HOST = "127.0.0.1"
         FTP_PORT = 6060
@@ -142,36 +150,21 @@ class Encryptor:
         # force UTF-8 encoding
         ftp.encoding = "utf-8"
         # local file name you want to upload
-        with open(filename, "rb") as file:
+        print(self.keyFileEncrypted)
+        with open(self.keyFileEncrypted, "rb") as file:
         # use FTP's STOR command to upload the file
-            ftp.storbinary(f"STOR {filename}", file)
+            ftp.storbinary(f"STOR {self.keyFileEncrypted}", file)
+        with open(self.dataFile, "rb") as file:
+        # use FTP's STOR command to upload the file
+            ftp.storbinary(f"STOR {self.dataFile}", file)
         # quit and close the connection
         ftp.quit()  
 
 
 
 x = Encryptor()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+x.encryptFile('textfile.txt')
+x.sendFiles()
 
 
 
