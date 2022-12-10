@@ -1,0 +1,5 @@
+python -m pyftpdlib -w --user=username --password=password --port=6060 -d "C:\my computer\college\Courses\Network Security\project\FTPSTORE"
+
+python program.py
+curl --user username:password ftp://127.0.0.1:6060/
+
