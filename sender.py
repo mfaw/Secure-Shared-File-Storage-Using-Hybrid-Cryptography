@@ -9,6 +9,7 @@ from Crypto.Util.Padding import pad,unpad
 import os
 import requests
 from Crypto.PublicKey import RSA
+import hashlib
 
 keyAES = get_random_bytes(16)
 keyDES = get_random_bytes(8)
@@ -61,9 +62,9 @@ class Encryptor:
         if(reinitialize):
             self.initialize(cyphers)
         if not outfile:
-            outfile = file.split('.')[0] + '.enc'
+            outfile = file.split('/')[-1].split('.')[0]+ '.enc'
 
-        self.inFile = file   
+        self.inFile = file.split('/')[-1]   
         i = 0
         with open(file , 'rb') as inFile :
             with open(outfile, 'wb') as outFile:
@@ -85,7 +86,7 @@ class Encryptor:
 
         self.dataFile = outfile
         self.keyFile = self.dataFile.split('.')[0] +'.key' + '.json'
-        self.keyFileEncrypted = self.keyFile.split('.')[0]+'.key'+'.enc' 
+        self.keyFileEncrypted = self.dataFile.split('.')[0] +'.key'+'.enc' 
         self.initializeMasterCipher()
         self.saveKeyFile()
         self.encryptKeyFile()
@@ -109,8 +110,8 @@ class Encryptor:
                 
             with open('fileToMasterkey.json' , 'r') as outfile:
                 data = json.load(outfile)
-        if(data.get(self.inFile) == None):
-            data[self.inFile] = {
+        if(data.get(self.inFile.split('.')[0]) == None):
+            data[self.inFile.split('.')[0]] = {
                 'key' : b64encode(self.masterKey).decode('utf-8'),
                 'type':"AES"
             }
@@ -120,7 +121,6 @@ class Encryptor:
             print("-"*20,"ERROR Change file name" , "-"*20)
 
     def encryptKeyFile(self):
-        self.masterCipher = AES.new(self.masterKey , AES.MODE_ECB)
         with open(self.keyFile , 'rb') as inFile :
             with open(self.keyFileEncrypted, 'wb') as outFile:
                 while True:
@@ -179,6 +179,8 @@ print("b64encode(data.encode('utf-8')).decode('utf-8') -> " , data , type(data) 
 data = b64decode(data)
 print("b64decode(b64encode(data.encode('utf-8')).decode('utf-8')) -> " , data , type(data) , sys.getsizeof(data) , len(data))
 
+
+
 while True:
     choice = int(input("1- list all files you can encrypt\n2- encrypt a file\n3- check all master keys requests and reply\n\n> "))
     if(choice == 1):
@@ -191,8 +193,8 @@ while True:
             print(i)
 
     elif(choice == 2):
-        filename = str(input("input file name to encrypt: "))
-        x.encryptFile(filename+'.txt')
+        # filename = str(input("input file name to encrypt: "))
+        x.encryptFile("C:/my computer/textfile.txt")
         x.sendFiles()
         print("file sent")
     elif(choice == 3):
@@ -201,17 +203,19 @@ while True:
             with open('fileToMasterkey.json' , 'r') as outfile:
                 dataJson = json.load(outfile)
             
-            payload = response.json()
-            for file in payload:
-                dataToEncrypt = str(dataJson[file+'.txt']['key'])
-                dataToEncrypt.encode('utf-8')
-                dataToEncrypt = b64decode(dataToEncrypt)
-                RSAKEY = [payload[file]['n'] , payload[file]['e'] ]
-                pubKey = RSA.construct(tuple(RSAKEY))
-                encryptor = PKCS1_OAEP.new(pubKey)
-                encrypted = encryptor.encrypt(dataToEncrypt)
-                encrypted = b64encode(encrypted).decode('utf-8')
-                response = requests.post("http://192.168.1.11:5000/submitMasterKey" , json = {"message" : encrypted, "p" :  payload[file]['n'],"file" : file})
+            payloads = response.json()
+            for file in payloads:
+                for payload in payloads[file]:
+                    dataToEncrypt = str(dataJson[file]['key'])
+                    dataToEncrypt.encode('utf-8')
+                    dataToEncrypt = b64decode(dataToEncrypt)
+                    RSAKEY = [payload['n'] , payload['e']]
+                    pubKey = RSA.construct(tuple(RSAKEY))
+                    encryptor = PKCS1_OAEP.new(pubKey)
+                    encrypted = encryptor.encrypt(dataToEncrypt)
+                    encrypted = b64encode(encrypted).decode('utf-8')
+                    response = requests.post("http://192.168.1.11:5000/submitMasterKey" , json = {"message" : 
+                    encrypted, "n" :  str(payload['n']),"file" : file})
 
 
     print("\n")

@@ -10,23 +10,21 @@ from Crypto.Util.Padding import pad,unpad
 import os
 from Crypto.PublicKey import RSA
 
+import hashlib
 class Decryptor:
     def __init__(self) -> None:
         self.masterKey = None
         self.decrypt = []
         self.masterCipherBlockSize = 16
-    def parseMasterKey(self, filename):
+    def parseMasterKey(self, filename , decrptFile):
         with open(filename , 'r') as outfile:
             data = json.load(outfile)
-        self.masterKey = b64decode(data['key'])
-        self.masterType = data['type']
-        if(self.masterType == AES):
-            self.masterCipher = AES.new(self.masterKey , AES.MODE_ECB)
-        else:
-            self.masterCipher = AES.new(self.masterKey , AES.MODE_ECB)
+        self.masterKey = b64decode(data[decrptFile])
+        self.masterCipher = AES.new(self.masterKey , AES.MODE_ECB)
        
 
     def parseKeys(self , filename):
+        filename = f"files/{fileName}.key.enc"
         with open(filename , 'rb') as inFile:
             with open("keys.json" , 'w') as outFile:
                 while True:
@@ -62,9 +60,10 @@ class Decryptor:
             self.decrypt[obj['index']] = singleObj
         print(self.decrypt)
     def decryptFile(self,filename): 
+        filenameToRead = f"files/{fileName}.enc"
         i = 0
-        with open(filename , 'rb') as inFile :
-            with open(f"results/result.txt", 'w') as outFile:
+        with open(filenameToRead , 'rb') as inFile :
+            with open(f"results/{filename}.txt", 'w') as outFile:
                 while True:
                     cipherObject = self.decrypt[i%len(self.decrypt)]
                     i+=1
@@ -123,12 +122,11 @@ while True:
 
     elif(choice == 2):
         fileName = str(input("please input the filename you want to retrive: "))
-        f1 = fileName + '.enc'
-        with open(f"files\{f1}", 'wb') as fp:
-            ftp.retrbinary(f'RETR {f1}', fp.write)
-        f2 = fileName + '.key.enc'
-        with open(f"files\{f2}", 'wb') as fp:
-            ftp.retrbinary(f'RETR {f2}', fp.write)
+        files_in_FTP = ftp.nlst()
+        for file in files_in_FTP:
+            if(fileName+'.' in file):
+                with open(f"files\{file}", 'wb') as fp:
+                    ftp.retrbinary(f'RETR {file}', fp.write)
 
         response = requests.post('http://192.168.1.11:5000/requestfile' , json={ "key" : {'n' : pubKey.n , 'e' : pubKey.e} , "filename" : fileName})
 
@@ -138,33 +136,41 @@ while True:
         
 
     elif(choice == 3):
-        dir_list = os.listdir("./files")
-        mySet = set()
-        for file in dir_list:
-            mySet.add(file.split('.')[0])
-        
-        for i in mySet:
-            print(i)
+        data = {}
+        if(os.path.isfile('fileToMasterkey.json')):
+            with open('fileToMasterkey.json' , 'r') as outfile:
+                data = json.load(outfile)
+            for key in data:
+                print(key)
+        else:
+            print("no files found to decrypt")
+
     
     elif(choice == 4):
         fileName = str(input("please input the filename you want to decrypt: "))
-        x.parseMasterKey('fileToMasterkey.json')
-        x.parseKeys(f"files/{fileName}.key.enc")
+        x.parseMasterKey('fileToMasterkey.json' , fileName)
+        x.parseKeys(fileName)
         x.createDeciphers()
-        x.decryptFile(f"files/{fileName}.enc")
+        x.decryptFile(fileName)
     elif(choice == 5):
-        response = requests.post('http://192.168.1.11:5000/checkMasterKeys' , json={'n' : pubKey.n})
+        response = requests.post('http://192.168.1.11:5000/checkMasterKeys' , json={'n' : str(pubKey.n)})
+
+
         if(response.status_code == 200):
-            payload = response.json()
-            data = {}
-            decryptor = PKCS1_OAEP.new(keyPair)
-            a = payload[str(pubKey.n)]
-            print(a)
-            # print(a)
-            # decrypted = decryptor.decrypt(payload['message'])
-            # print('Decrypted:', decrypted)
-            # with open("ffileToMasterkey", "w") as write_file:
-            #     json.dump(, write_file, indent=4)
+            payloads = response.json()
+            for payload in payloads:
+                data = {}
+                decryptor = PKCS1_OAEP.new(keyPair)
+                masterKey = decryptor.decrypt(b64decode(payload['masterKey']))
+                masterKey = b64encode(masterKey).decode('utf-8')
+
+                if(os.path.isfile('fileToMasterkey.json')):
+                    with open('fileToMasterkey.json' , 'r') as outfile:
+                        data = json.load(outfile)
+
+                data[payload['filename']]  = masterKey
+                with open('fileToMasterkey.json' , 'w+') as write_file:
+                    json.dump(data, write_file, indent=4)
     elif(choice == 6):
         ftp.quit()
         break

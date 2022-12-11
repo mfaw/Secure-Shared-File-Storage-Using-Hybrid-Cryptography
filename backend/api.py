@@ -10,23 +10,32 @@ masters = {}
 @app.route("/requestfile" , methods = ['POST'])
 def requestfile():
     payload = request.get_json()
-    requestFiles[payload['filename']] = payload['key']
+    if payload['filename'] in requestFiles:
+         requestFiles[payload['filename']].append(payload['key'])
+    else:
+        requestFiles[payload['filename']] = [payload['key']]
     print(requestFiles)
     return "okay"
 
 @app.route("/submitMasterKey" , methods = ['POST' , 'GET'])
 def submitMasterKey():
     payload = request.get_json()
-    masters[payload['p']] = {"masterKey" : payload['message'] , "filename" : payload['file']}
-    del requestFiles[payload['file']]
+    if str(payload['n']) in masters:
+        masters[str(payload['n'])].append({"masterKey" : payload['message'] , "filename" : payload['file']})
+    else:
+        masters[str(payload['n'])] = [{"masterKey" : payload['message'] , "filename" : payload['file']}]
+
     print(masters)
+    del requestFiles[payload['file']]
     return "okay"
 
 
 @app.route("/checkMasterKeys" , methods = ['POST'])
 def checkMasterKeys():
     payload = request.get_json()
-    return masters[payload['n']]
+    data = masters[str(payload['n'])]
+    del masters[str(payload['n'])]
+    return data
 
 @app.route("/checkMasterKeysRequests" , methods = ['GET'])
 def checkMasterKeysRequests():
