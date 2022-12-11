@@ -1,4 +1,6 @@
 {
-    "key": "LKfBFVjoj9TYP1BZgneCbQ==",
-    "type" : "AES"
+    "textfile.txt": {
+        "key": "SctbulYM+Sxyf0USrQvYiQ==",
+        "type": "AES"
+    }
 }

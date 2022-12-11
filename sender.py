@@ -1,11 +1,14 @@
 import ftplib
 import sys
 from Crypto.Cipher import AES, DES
+from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 import json
 from base64 import b64encode,b64decode
 from Crypto.Util.Padding import pad,unpad
 import os
+import requests
+from Crypto.PublicKey import RSA
 
 keyAES = get_random_bytes(16)
 keyDES = get_random_bytes(8)
@@ -163,8 +166,55 @@ class Encryptor:
 
 
 x = Encryptor()
-x.encryptFile('textfile.txt')
-x.sendFiles()
+
+
+data = 'hello'
+print("data -> " , data , type(data) , sys.getsizeof(data) , len(data))
+data = data.encode('utf-8')
+print("data.encode('utf-8') -> " , data , type(data) , sys.getsizeof(data) , len(data))
+data = b64encode(data)
+print("b64encode(data.encode('utf-8')) -> " , data , type(data) , sys.getsizeof(data) , len(data))
+data.decode('utf-8')
+print("b64encode(data.encode('utf-8')).decode('utf-8') -> " , data , type(data) , sys.getsizeof(data) , len(data))
+data = b64decode(data)
+print("b64decode(b64encode(data.encode('utf-8')).decode('utf-8')) -> " , data , type(data) , sys.getsizeof(data) , len(data))
+
+while True:
+    choice = int(input("1- list all files you can encrypt\n2- encrypt a file\n3- check all master keys requests and reply\n\n> "))
+    if(choice == 1):
+        dir_list = os.listdir("./")
+        mySet = set()
+        for file in dir_list:
+            mySet.add(file.split('.')[0])
+        
+        for i in mySet:
+            print(i)
+
+    elif(choice == 2):
+        filename = str(input("input file name to encrypt: "))
+        x.encryptFile(filename+'.txt')
+        x.sendFiles()
+        print("file sent")
+    elif(choice == 3):
+        response = requests.get("http://192.168.1.11:5000/checkMasterKeysRequests")
+        if(response.status_code == 200):
+            with open('fileToMasterkey.json' , 'r') as outfile:
+                dataJson = json.load(outfile)
+            
+            payload = response.json()
+            for file in payload:
+                dataToEncrypt = str(dataJson[file+'.txt']['key'])
+                dataToEncrypt.encode('utf-8')
+                dataToEncrypt = b64decode(dataToEncrypt)
+                RSAKEY = [payload[file]['n'] , payload[file]['e'] ]
+                pubKey = RSA.construct(tuple(RSAKEY))
+                encryptor = PKCS1_OAEP.new(pubKey)
+                encrypted = encryptor.encrypt(dataToEncrypt)
+                encrypted = b64encode(encrypted).decode('utf-8')
+                response = requests.post("http://192.168.1.11:5000/submitMasterKey" , json = {"message" : encrypted, "p" :  payload[file]['n'],"file" : file})
+
+
+    print("\n")
 
 
 
@@ -174,20 +224,6 @@ x.sendFiles()
 
 
 
-
-
-
-
-    # data = 'hello'
-    # print("data -> " , data , type(data) , sys.getsizeof(data) , len(data))
-    # data = data.encode('utf-8')
-    # print("data.encode('utf-8') -> " , data , type(data) , sys.getsizeof(data) , len(data))
-    # data = b64encode(data)
-    # print("b64encode(data.encode('utf-8')) -> " , data , type(data) , sys.getsizeof(data) , len(data))
-    # data.decode('utf-8')
-    # print("b64encode(data.encode('utf-8')).decode('utf-8') -> " , data , type(data) , sys.getsizeof(data) , len(data))
-    # data = b64decode(data)
-    # print("b64decode(b64encode(data.encode('utf-8')).decode('utf-8')) -> " , data , type(data) , sys.getsizeof(data) , len(data))
 
     # f.close()
     # key = get_random_bytes(16)
