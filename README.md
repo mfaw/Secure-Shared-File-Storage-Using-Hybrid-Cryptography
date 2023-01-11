@@ -10,7 +10,9 @@ File Storage (sender perspective):
 4.	The keys for cryptography algorithms are then grouped in a key file and encrypted using a different algorithm and the key for this algorithm is also generated randomly and is called the file master key.
 5.	The data file and the key file are than uploaded to the FTP server
 6.	A copy of the master key is kept in a local file with the file name to be shared
+
 This all will be exposed as simple GUI interface to the clint to be able to use it
+
 File Retrieval (receiver perspective):
 1.	A user requesting the master key must provide his public key to the owner
 2.	The owner then encrypts the master key of the requested file with the requesting user public key and sends it to him
