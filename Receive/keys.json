@@ -1,0 +1,17 @@
+[
+    {
+        "type": "AES",
+        "key": "UXz2xgekp1/zYgCLCt1+mQ==",
+        "index": 0
+    },
+    {
+        "type": "DES",
+        "key": "6AgsRqMc23k=",
+        "index": 1
+    },
+    {
+        "type": "ARC2",
+        "key": "K2wCBeyz9JwAcFBuBgwPdQ==",
+        "index": 2
+    }
+]   

@@ -1,6 +1,6 @@
 import ftplib
 import sys
-from Crypto.Cipher import AES, DES
+from Crypto.Cipher import AES, DES , ARC2 , Blowfish
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 import requests
@@ -20,7 +20,7 @@ class Decryptor:
         with open(filename , 'r') as outfile:
             data = json.load(outfile)
         self.masterKey = b64decode(data[decrptFile])
-        self.masterCipher = AES.new(self.masterKey , AES.MODE_ECB)
+        self.masterCipher = Blowfish.new(self.masterKey , Blowfish.MODE_ECB)
        
 
     def parseKeys(self , filename):
@@ -57,6 +57,12 @@ class Decryptor:
                         'type' : 'DES',
                         'cipher' : DES.new(key , AES.MODE_ECB)
                     }
+            elif(obj['type'] == "ARC2"):
+                 singleObj = {
+                            'size' : ARC2.block_size,
+                            'type' : 'ARC2',
+                            'cipher' : ARC2.new(key, ARC2.MODE_ECB)
+                    }
             self.decrypt[obj['index']] = singleObj
         print(self.decrypt)
     def decryptFile(self,filename): 
@@ -73,6 +79,8 @@ class Decryptor:
                     ct = cipherObject['cipher'].decrypt(block)
                     ct = ct.decode('utf-8')
                     outFile.write(ct)
+        inFile.close()
+        outFile.close()
 
 
 x = Decryptor()
@@ -81,35 +89,25 @@ x = Decryptor()
 keyPair = RSA.generate(3072)
 pubKey = keyPair.publickey()
 
-# print(f"Public key:  (n={hex(pubKey.n)}, e={hex(pubKey.e)})")
 pubKeyPEM = hex(pubKey.n)
 print(pubKeyPEM)
 print(type(pubKeyPEM))
 
 a = pubKeyPEM.encode('utf-8')
-# print(pubKeyPEM.decode('ascii'))
-
-# print(f"Private key: (n={hex(pubKey.n)}, d={hex(keyPair.d)})")
-# privKeyPEM = keyPair.exportKey()
-# print(privKeyPEM.decode('ascii'))
-
-
-FTP_HOST = "127.0.0.1"
-FTP_PORT = 6060
-FTP_USER = "username"
-FTP_PASS = "password"
-# connect to the FTP server
-ftp = ftplib.FTP()
-ftp.connect(FTP_HOST,FTP_PORT)
-ftp.login(FTP_USER,FTP_PASS)
-# force UTF-8 encoding
-ftp.encoding = "utf-8"
-
-print(ftp.nlst())
 
 
 while True:
     choice = int(input("1- list all of the available files in the FTP sever\n2- to retrive a file \n3- list of the files that you can decrypt\n4- to decrypt a file\n5- recive all master keys requested\n6- close the terminal\n\n> "))
+    FTP_HOST = "127.0.0.1"
+    FTP_PORT = 6060
+    FTP_USER = "username"
+    FTP_PASS = "password"
+    # connect to the FTP server
+    ftp = ftplib.FTP()
+    ftp.connect(FTP_HOST,FTP_PORT)
+    ftp.login(FTP_USER,FTP_PASS)
+    # force UTF-8 encoding
+    ftp.encoding = "utf-8"
     print("\n")
     if(choice == 1):   
         files_in_FTP = ftp.nlst()
@@ -174,5 +172,6 @@ while True:
     elif(choice == 6):
         ftp.quit()
         break
+    ftp.quit()
     print("\n")
 

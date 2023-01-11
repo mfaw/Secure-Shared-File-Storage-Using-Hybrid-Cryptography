@@ -1,6 +1,6 @@
 import ftplib
 import sys
-from Crypto.Cipher import AES, DES
+from Crypto.Cipher import AES, DES , ARC2 , Blowfish
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 import json
@@ -10,28 +10,26 @@ import os
 import requests
 from Crypto.PublicKey import RSA
 import hashlib
+from tkinter import *
+from tkinter import filedialog
 
-keyAES = get_random_bytes(16)
-keyDES = get_random_bytes(8)
-cipherAES = AES.new(keyAES, AES.MODE_CBC)
-cipherDES = DES.new(keyDES, AES.MODE_CBC)
 class Encryptor:
-    def __init__ (self, cyphers = ['AES' , 'DES'], masterCipherType = 'AES'):
+    def __init__ (self, ciphers = ['AES' , 'DES'], masterCipherType = 'Blowfish'):
         self.dataFile = None
         self.keyFile = None
         self.keys = []
-        self.cyphers = []
+        self.ciphers = []
         self.masterKey = None
-        self.initialize(cyphers=cyphers)
+        self.initialize(ciphers=ciphers)
         self.masterCipherType = masterCipherType
         self.masterCipher = None
 
-    def initialize(self, cyphers):
-        self.cyphers = []
+    def initialize(self, ciphers):
+        self.ciphers = []
         self.keys = []
         self.masterKey = None
         i = -1
-        for c in cyphers:
+        for c in ciphers:
             i+=1
             if(c == 'AES'):
                 key = get_random_bytes(16)
@@ -40,7 +38,7 @@ class Encryptor:
                     'key' : b64encode(key).decode('utf-8'),
                     'index' : i
                 })
-                self.cyphers.append({
+                self.ciphers.append({
                     'size' : AES.block_size,
                     'type' : 'AES',
                     'cipher' : AES.new(key , AES.MODE_ECB)
@@ -52,15 +50,26 @@ class Encryptor:
                     'key' : b64encode(key).decode('utf-8'),
                     'index' : i
                 })
-                self.cyphers.append({
+                self.ciphers.append({
                     'size' : DES.block_size,
                     'type' : 'DES',
                     'cipher' : DES.new(key, DES.MODE_ECB)
                 })
-    
-    def encryptFile(self , file , outfile = None , reinitialize = True ,cyphers = ['AES' , 'DES']):
+            elif(c == 'ARC2'):
+                key = get_random_bytes(16)
+                self.keys.append({
+                    'type' : 'ARC2',
+                    'key' : b64encode(key).decode('utf-8'),
+                    'index' : i
+                })
+                self.ciphers.append({
+                    'size' : ARC2.block_size,
+                    'type' : 'ARC2',
+                    'cipher' : ARC2.new(key, ARC2.MODE_ECB)
+                })
+    def encryptFile(self , file , outfile = None , reinitialize = True ,ciphers = ['AES' , 'DES' , 'ARC2']):
         if(reinitialize):
-            self.initialize(cyphers)
+            self.initialize(ciphers)
         if not outfile:
             outfile = file.split('/')[-1].split('.')[0]+ '.enc'
 
@@ -69,7 +78,7 @@ class Encryptor:
         with open(file , 'rb') as inFile :
             with open(outfile, 'wb') as outFile:
                 while True:
-                    cipherObject = self.cyphers[i%len(self.cyphers)]
+                    cipherObject = self.ciphers[i%len(self.ciphers)]
                     i+=1
                     block = inFile.read(cipherObject['size'])
 
@@ -102,18 +111,21 @@ class Encryptor:
         if(self.masterCipherType == 'AES'):
             self.masterKey = get_random_bytes(16)
             self.masterCipher = AES.new(self.masterKey , AES.MODE_ECB)
-            self.masterCipherBlockSize = 16
+            self.masterCipherBlockSize = AES.block_size
+        elif(self.masterCipherType == 'Blowfish'):
+            self.masterKey = get_random_bytes(56)
+            self.masterCipher = Blowfish.new(self.masterKey , AES.MODE_ECB)
+            self.masterCipherBlockSize = Blowfish.block_size
 
     def saveMasterKey(self):
         data = {}
-        if(os.path.isfile('fileToMasterkey.json')):
-                
+        if(os.path.isfile('fileToMasterkey.json')):  
             with open('fileToMasterkey.json' , 'r') as outfile:
                 data = json.load(outfile)
         if(data.get(self.inFile.split('.')[0]) == None):
             data[self.inFile.split('.')[0]] = {
                 'key' : b64encode(self.masterKey).decode('utf-8'),
-                'type':"AES"
+                'type': self.masterCipherType
             }
             with open('fileToMasterkey.json' , 'w+') as write_file:
                 json.dump(data, write_file, indent=4)
@@ -178,26 +190,28 @@ data.decode('utf-8')
 print("b64encode(data.encode('utf-8')).decode('utf-8') -> " , data , type(data) , sys.getsizeof(data) , len(data))
 data = b64decode(data)
 print("b64decode(b64encode(data.encode('utf-8')).decode('utf-8')) -> " , data , type(data) , sys.getsizeof(data) , len(data))
+data = data.decode('utf-8')
+print("b64decode(b64encode(data.encode('utf-8')).decode('utf-8')).decode('utf-8) -> " , data , type(data) , sys.getsizeof(data) , len(data))
 
-
+def guiSend():
+    # can limit file type using filetypes
+    filepath = filedialog.askopenfilename(filetypes=[("text files", ".txt")])
+    x.encryptFile(filepath)
+    x.sendFiles()
+    window.destroy()
 
 while True:
-    choice = int(input("1- list all files you can encrypt\n2- encrypt a file\n3- check all master keys requests and reply\n\n> "))
-    if(choice == 1):
-        dir_list = os.listdir("./")
-        mySet = set()
-        for file in dir_list:
-            mySet.add(file.split('.')[0])
-        
-        for i in mySet:
-            print(i)
+    choice = int(input("1- encrypt a file\n2- check all master keys requests and reply\n\n> "))
 
-    elif(choice == 2):
+    if(choice == 1):
         # filename = str(input("input file name to encrypt: "))
-        x.encryptFile("C:/my computer/textfile.txt")
-        x.sendFiles()
+        window = Tk()
+        window.geometry("200x125")
+        button = Button(window , text = "Open File", command=guiSend)
+        button.pack(pady=40 , side=TOP)
+        window.mainloop()
         print("file sent")
-    elif(choice == 3):
+    elif(choice == 2):
         response = requests.get("http://192.168.1.11:5000/checkMasterKeysRequests")
         if(response.status_code == 200):
             with open('fileToMasterkey.json' , 'r') as outfile:
@@ -215,53 +229,7 @@ while True:
                     encrypted = encryptor.encrypt(dataToEncrypt)
                     encrypted = b64encode(encrypted).decode('utf-8')
                     response = requests.post("http://192.168.1.11:5000/submitMasterKey" , json = {"message" : 
-                    encrypted, "n" :  str(payload['n']),"file" : file})
+                    encrypted, "n" :  str(payload['n']) ,"file" : file})
 
 
     print("\n")
-
-
-
-
-
-
-
-
-
-
-    # f.close()
-    # key = get_random_bytes(16)
-    # cipher = AES.new(key, AES.MODE_CBC)
-    # ct_bytes = cipher.encrypt(pad(message, AES.block_size))
-    # iv = b64encode(cipher.iv).decode('utf-8')
-    # ct = b64encode(ct_bytes).decode('utf-8')
-    # result = json.loads(json.dumps({'iv':iv, 'ciphertext':ct}))
-    # print(result)
-    # print(os.path.getsize(file))
-
-# data = "hello"
-# print("data -> " , data , type(data) , sys.getsizeof(data) , len(data))
-# data = data.encode('utf-8')
-# print("data.encode('utf-8') -> " , data , type(data) , sys.getsizeof(data) , len(data))
-# data = b64encode(data)
-# print("b64encode(data.encode('utf-8')) -> " , data , type(data) , sys.getsizeof(data) , len(data))
-# data.decode('utf-8')
-# print("b64encode(data.encode('utf-8')).decode('utf-8') -> " , data , type(data) , sys.getsizeof(data) , len(data))
-# data = b64decode(data)
-# print("b64decode(b64encode(data.encode('utf-8')).decode('utf-8')) -> " , data , type(data) , sys.getsizeof(data) , len(data))
-
-
-
-
-# try:
-#     iv = b64decode(result["iv"])
-#     ct = b64decode(result['ciphertext'])
-#     cipher = AES.new(key, AES.MODE_CBC, iv)
-#     pt = unpad(cipher.decrypt(ct), AES.block_size)
-#     print("The message was: ", pt.decode('utf-8'))
-# except (ValueError, KeyError):
-#     print("Incorrect decryption")
-
-
-# encrypt_AES_CBC('sometextfile.txt')
-
